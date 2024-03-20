@@ -1,0 +1,51 @@
+---
+- name: Get your kernel version
+  ansible.builtin.debug:
+    var: ansible_kernel
+
+- name: Test live patching tasks
+  block:
+  # Catch systems that don't yet have a live patch package
+    - name: Fail prematurely if no kpatch-patch available in repos
+      ansible.builtin.command:
+        cmd: "{{ package_manager_command }} search kpatch-patch"
+      become: true
+      register: _
+      failed_when: ('No matches found' in _.stderr)
+      changed_when: false
+
+    - name: Install/update the live patching package
+      ansible.builtin.package:
+        name: "kpatch-patch = {{ ansible_kernel }}"
+        state: present
+      become: true
+
+    - name: Verify that the kernel is patched
+      ansible.builtin.command:
+        cmd: kpatch list
+      register: kernel_patches
+      changed_when: false
+
+    - name: Show the kernel patches
+      ansible.builtin.debug:
+        msg: "{{ kernel_patches.stdout_lines[1] }}"
+
+    - name: Get current status of kpatch-dnf (auto or manual)
+      ansible.builtin.command:
+        cmd: "{{ package_manager_command }} -y kpatch status"
+      become: true
+      register: kpatch_status
+      changed_when: false
+
+    - name: Enable DNF plugin for auto install live patches
+      ansible.builtin.command:
+        cmd: "{{ package_manager_command }} -y kpatch auto"
+      become: true
+      changed_when: true
+      when: >-
+        'Kpatch update setting: manual' in kpatch_status.stdout
+
+  rescue:
+    - name: No known kernel live update package or no repository subscribed
+      ansible.builtin.debug:
+        msg: No known live patch package or system is not subscribed to repos

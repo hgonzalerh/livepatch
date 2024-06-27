@@ -16,7 +16,7 @@
 
     - name: Install/update the live patching package
       ansible.builtin.package:
-        name: "kpatch-patch = {{ ansible_kernel }}"
+        name: kpatch-patch = {{ ansible_kernel }}
         state: present
       become: true
 
